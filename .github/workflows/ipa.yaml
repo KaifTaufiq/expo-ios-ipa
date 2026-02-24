@@ -29,9 +29,17 @@ jobs:
 
       - name: Build App (Unsigned)
         run: |
+          # Find the workspace file
+          WORKSPACE=$(ls ios/*.xcworkspace | head -1)
+          # Get the name of the workspace without the extension
+          SCHEME=$(basename "$WORKSPACE" .xcworkspace)
+          
+          echo "Building with Workspace: $WORKSPACE"
+          echo "Building with Scheme: $SCHEME"
+
           xcodebuild archive \
-            -workspace ios/*.xcworkspace \
-            -scheme $(ls ios/*.xcworkspace | xargs basename -s .xcworkspace) \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
             -configuration Release \
             -sdk iphoneos \
             -archivePath ./build/App.xcarchive \
