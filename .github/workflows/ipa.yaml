@@ -1,6 +1,6 @@
 name: Build Unsigned iOS IPA
 on:
-  workflow_dispatch: # Allows manual trigger
+  workflow_dispatch:
 
 jobs:
   build:
@@ -18,45 +18,40 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Install Expo CLI
-        run: npm install -g expo-cli
-
       - name: Prebuild iOS
         run: npx expo prebuild --platform ios
 
-      - name: Install CocoaPods
-        run: cd ios && pod install
-
       - name: Build App (Unsigned)
         run: |
-          # Use -d to list the directory itself, not its contents!
-          WORKSPACE=$(ls -d ios/*.xcworkspace | head -1)
-          # Get the name of the workspace without the extension
+          cd ios
+          WORKSPACE=$(ls *.xcworkspace | head -1)
           SCHEME=$(basename "$WORKSPACE" .xcworkspace)
-          
-          echo "Building with Workspace: $WORKSPACE"
-          echo "Building with Scheme: $SCHEME"
+          ARCHIVE_NAME=unsigned.xcarchive
+          IPA_NAME="${SCHEME}.ipa"
 
-          xcodebuild archive \
-            -workspace "$WORKSPACE" \
+          echo "Workspace: $WORKSPACE"
+          echo "Scheme: $SCHEME"
+          echo "Archive: $ARCHIVE_NAME"
+          echo "IPA: $IPA_NAME"
+
+          xcodebuild -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
             -configuration Release \
-            -sdk iphoneos \
-            -archivePath ./build/App.xcarchive \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
+            clean archive \
+            -archivePath "$ARCHIVE_NAME" \
+            -destination "generic/platform=iOS" \
             CODE_SIGN_IDENTITY="" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
 
-      - name: Create Unsigned IPA
-        run: |
-          mkdir -p Payload
-          cp -r ./build/App.xcarchive/Products/Applications/*.app ./Payload/
-          zip -r App-Unsigned.ipa Payload
-          rm -rf Payload
+          cd "$ARCHIVE_NAME/Products"
+          mv Applications Payload
+          zip -r Payload.zip Payload
+          mv Payload.zip ../../"$IPA_NAME"
+          cd ../..
 
-      - name: Upload Artifact
+      - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ios-unsigned-ipa
-          path: App-Unsigned.ipa
+          path: ios/*.ipa
