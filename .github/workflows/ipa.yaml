@@ -1,0 +1,54 @@
+name: Build Unsigned iOS IPA
+on:
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Expo CLI
+        run: npm install -g expo-cli
+
+      - name: Prebuild iOS
+        run: npx expo prebuild --platform ios
+
+      - name: Install CocoaPods
+        run: cd ios && pod install
+
+      - name: Build App (Unsigned)
+        run: |
+          xcodebuild archive \
+            -workspace ios/*.xcworkspace \
+            -scheme $(ls ios/*.xcworkspace | xargs basename -s .xcworkspace) \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath ./build/App.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
+
+      - name: Create Unsigned IPA
+        run: |
+          mkdir -p Payload
+          cp -r ./build/App.xcarchive/Products/Applications/*.app ./Payload/
+          zip -r App-Unsigned.ipa Payload
+          rm -rf Payload
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-unsigned-ipa
+          path: App-Unsigned.ipa
