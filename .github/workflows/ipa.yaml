@@ -29,8 +29,8 @@ jobs:
 
       - name: Build App (Unsigned)
         run: |
-          # Find the workspace file
-          WORKSPACE=$(ls ios/*.xcworkspace | head -1)
+          # Use -d to list the directory itself, not its contents!
+          WORKSPACE=$(ls -d ios/*.xcworkspace | head -1)
           # Get the name of the workspace without the extension
           SCHEME=$(basename "$WORKSPACE" .xcworkspace)
           
