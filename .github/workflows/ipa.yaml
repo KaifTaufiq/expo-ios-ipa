@@ -15,6 +15,11 @@ jobs:
           node-version: 20
           cache: "npm"
 
+      - name: Fix Node PATH for Xcode
+        run: |
+          # Create a symlink so Xcode's internal scripts can find Node.js
+          sudo ln -s $(which node) /usr/local/bin/node || true
+
       - name: Install dependencies
         run: npm install
 
@@ -25,7 +30,7 @@ jobs:
         run: |
           cd ios
           
-          # 1. Find the workspace and scheme
+          # Find the workspace and scheme
           WORKSPACE=$(find . -maxdepth 1 -name '*.xcworkspace' | head -1 | xargs basename)
           if [ -z "$WORKSPACE" ]; then
             echo "No .xcworkspace file found!"
@@ -37,7 +42,7 @@ jobs:
           echo "Workspace: $WORKSPACE"
           echo "Scheme: $SCHEME"
 
-          # 2. Use 'build' instead of 'archive' and output to a specific DerivedData folder
+          # Build the raw .app file (added ENTITLEMENTS_REQUIRED=NO)
           xcodebuild build \
             -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
@@ -47,9 +52,10 @@ jobs:
             -destination "generic/platform=iOS" \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            ENTITLEMENTS_REQUIRED=NO
 
-          # 3. Locate the generated .app file
+          # Locate the generated .app file
           APP_PATH=$(find ./DerivedData/Build/Products/Release-iphoneos -name "*.app" | head -1)
           
           if [ -z "$APP_PATH" ]; then
@@ -59,7 +65,7 @@ jobs:
           
           echo "Found .app at: $APP_PATH"
 
-          # 4. Manually package the .app into an .ipa
+          # Manually package the .app into an .ipa
           mkdir Payload
           cp -R "$APP_PATH" Payload/
           zip -r "$IPA_NAME" Payload
