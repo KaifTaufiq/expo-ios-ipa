@@ -42,39 +42,30 @@ jobs:
           echo "Workspace: $WORKSPACE"
           echo "Scheme: $SCHEME"
 
-          # Build the raw .app file (added ENTITLEMENTS_REQUIRED=NO)
-          xcodebuild build \
-            -workspace "$WORKSPACE" \
+          # Your exact local xcodebuild command, using dynamic variables
+          xcodebuild -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
             -configuration Release \
-            -sdk iphoneos \
-            -derivedDataPath ./DerivedData \
+            clean archive \
+            -archivePath unsigned.xcarchive \
             -destination "generic/platform=iOS" \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            ENTITLEMENTS_REQUIRED=NO
+            CODE_SIGNING_ALLOWED=NO
 
-          # Locate the generated .app file
-          APP_PATH=$(find ./DerivedData/Build/Products/Release-iphoneos -name "*.app" | head -1)
+          # Your exact local packaging steps
+          cd unsigned.xcarchive/Products
+          mv Applications Payload
+          zip -r Payload.zip Payload
           
-          if [ -z "$APP_PATH" ]; then
-            echo "Error: .app file was not generated!"
-            exit 1
-          fi
+          # Move the zip back to the ios directory as the final IPA
+          mv Payload.zip "../../$IPA_NAME"
           
-          echo "Found .app at: $APP_PATH"
-
-          # Manually package the .app into an .ipa
-          mkdir Payload
-          cp -R "$APP_PATH" Payload/
-          zip -r "$IPA_NAME" Payload
-          
-          # Cleanup
-          rm -rf Payload ./DerivedData
+          # Go back to the ios directory
+          cd ../../
           
           echo "🎉 Successfully created $IPA_NAME"
-
+          
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
