@@ -24,35 +24,50 @@ jobs:
       - name: Build App (Unsigned)
         run: |
           cd ios
+          
+          # 1. Find the workspace and scheme
           WORKSPACE=$(find . -maxdepth 1 -name '*.xcworkspace' | head -1 | xargs basename)
           if [ -z "$WORKSPACE" ]; then
             echo "No .xcworkspace file found!"
             exit 1
           fi
           SCHEME=$(basename "$WORKSPACE" .xcworkspace)
-          ARCHIVE_NAME=unsigned.xcarchive
           IPA_NAME="${SCHEME}.ipa"
 
           echo "Workspace: $WORKSPACE"
           echo "Scheme: $SCHEME"
-          echo "Archive: $ARCHIVE_NAME"
-          echo "IPA: $IPA_NAME"
 
-          xcodebuild -workspace "$WORKSPACE" \
+          # 2. Use 'build' instead of 'archive' and output to a specific DerivedData folder
+          xcodebuild build \
+            -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
             -configuration Release \
-            clean archive \
-            -archivePath "$ARCHIVE_NAME" \
+            -sdk iphoneos \
+            -derivedDataPath ./DerivedData \
             -destination "generic/platform=iOS" \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
 
-          cd "$ARCHIVE_NAME/Products"
-          mv Applications Payload
-          zip -r Payload.zip Payload
-          mv Payload.zip ../../"$IPA_NAME"
-          cd ../..
+          # 3. Locate the generated .app file
+          APP_PATH=$(find ./DerivedData/Build/Products/Release-iphoneos -name "*.app" | head -1)
+          
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: .app file was not generated!"
+            exit 1
+          fi
+          
+          echo "Found .app at: $APP_PATH"
+
+          # 4. Manually package the .app into an .ipa
+          mkdir Payload
+          cp -R "$APP_PATH" Payload/
+          zip -r "$IPA_NAME" Payload
+          
+          # Cleanup
+          rm -rf Payload ./DerivedData
+          
+          echo "🎉 Successfully created $IPA_NAME"
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
